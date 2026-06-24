@@ -1,10 +1,9 @@
 """
 lwbna_brain.py — distilled LWBNA-UNet brain segmenter (inference).
 
-Same `brain_mask(stir, slice_idx)` interface as SAM2BrainSegmenter /
-YOLOBrainSegmenter, so it drops into
-sir_analysis.auto_white_matter_reference(..., brain_mask_fn=...) and
-orbital_sir_map.py. Run with the MRI_TOM venv.
+Same `brain_mask(stir, slice_idx)` interface as SAM2BrainSegmenter, so it drops
+into sir_analysis.auto_white_matter_reference(..., brain_mask_fn=...) and
+orbital_sir_map.py. SAM2 labels the data; this distilled model runs production.
 """
 
 from __future__ import annotations

@@ -13,7 +13,7 @@ SIR = 外眼筋のSTIR平均信号 / 大脳白質のSTIR平均信号
 ## パイプライン全体像
 ```
 DICOM(coronal STIR)
-  → 大脳セグメンテーション (SAM2 教師 / 蒸留: YOLO11n-seg or LWBNA-UNet)
+  → 大脳セグメンテーション (SAM2 教師 → LWBNA-UNet に蒸留)
   → ヒストグラムで白質輝度抽出（低信号ピーク = 白質）
   → SIR = 各voxel信号 / 白質参照
   → 眼窩SIRマップ（ヒートマップ + SIR2.0等高線）
@@ -24,8 +24,8 @@ DICOM(coronal STIR)
 |---|---|
 | `sir_analysis.py` | 白質抽出・SIR・眼窩SIRマップ・DICOM読込。`brain_mask_fn`で脳セグ法を差替 |
 | `sam2_brain.py` | SAM2で大脳分離（教師/ラベリング） |
-| `yolo_brain.py` / `lwbna_brain.py` | 蒸留モデルの推論（SAM2と同`brain_mask`I/F） |
-| `orbital_sir_map.py` | 一気通貫CLI。`--sam2`/`--yolo`/`--lwbna`で切替 |
+| `lwbna_brain.py` | 蒸留LWBNA-UNetの推論（SAM2と同`brain_mask`I/F） |
+| `orbital_sir_map.py` | 一気通貫CLI。`--lwbna`(本番)/`--sam2`(ラベリング) |
 
 ## 本番コマンド（軽量・SAM2不要）
 ```bash
