@@ -1,10 +1,10 @@
 """
 build_brain_seg_dataset.py — SAM2 -> pixel-mask dataset for LWBNA-UNet.
 
-Unlike the YOLO-seg builder (polygon labels, which lose detail when the polygon
-has few points), this exports exact binary MASK IMAGES for semantic
-segmentation, and applies geometric QC to DROP failed SAM2 segmentations
-(whole-head grabs, one-sided leaks, ragged/leaky masks).
+Exports exact binary MASK IMAGES for semantic segmentation (pixel masks, not
+polygons — polygons lose detail when they have few points), and applies
+geometric QC to DROP failed SAM2 segmentations (whole-head grabs, one-sided
+leaks, ragged/leaky masks).
 
 Output:
   out/images/{train,val}/<series>_<z>.png   (8-bit windowed STIR slice)

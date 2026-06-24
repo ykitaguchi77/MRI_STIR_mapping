@@ -133,11 +133,9 @@ def main():
     p.add_argument("--sam2", action="store_true",
                    help="use SAM2 to segment the cerebrum for the WM reference "
                         "(clean, excludes sinuses/orbit; needs transformers + cache)")
-    p.add_argument("--yolo", metavar="WEIGHTS",
-                   help="use a distilled YOLO11-seg model (.pt) for the brain "
-                        "mask instead of SAM2 (fast production inference)")
     p.add_argument("--lwbna", metavar="WEIGHTS",
-                   help="use a distilled LWBNA-UNet model (.pt) for the brain mask")
+                   help="use a distilled LWBNA-UNet model (.pt) for the brain mask "
+                        "(fast production inference, no SAM2 needed)")
     p.add_argument("--tissue-pct", type=float, default=35.0,
                    help="percentile below which voxels are treated as background")
     p.add_argument("--plot", help="output QC PNG")
@@ -163,11 +161,6 @@ def main():
         print(f"Loading distilled LWBNA-UNet: {args.lwbna}")
         brain_mask_fn = LWBNABrainSegmenter(args.lwbna).brain_mask
         source = "LWBNA-UNet cerebrum"
-    elif args.yolo:
-        from yolo_brain import YOLOBrainSegmenter
-        print(f"Loading distilled YOLO11-seg: {args.yolo}")
-        brain_mask_fn = YOLOBrainSegmenter(args.yolo).brain_mask
-        source = "YOLO11-seg cerebrum"
     elif args.sam2:
         from sam2_brain import SAM2BrainSegmenter
         print("Loading SAM2 (facebook/sam2-hiera-large) for brain segmentation...")

@@ -24,6 +24,16 @@ SAM2 brain mask  →  human curation  →  LWBNA-UNet training  →  fast brain 
 A trained **LWBNA-UNet** model is included (`models/brain_lwbna_best.pt`,
 val Dice ≈ 0.978), so inference needs no SAM2.
 
+## Example results
+
+LWBNA-UNet cerebrum mask merged onto coronal STIR (brain slices):
+
+![brain mask merged on STIR](assets/example_brain_mask.png)
+
+Resulting orbital SIR map (top: STIR, bottom: SIR heat-map, white = SIR 2.0 contour):
+
+![orbital SIR map](assets/example_sir_map.png)
+
 ## Why this design
 - **Morphological skull-stripping fails** on coronal STIR: the brain stays
   connected to the face/sinuses through the skull base, so ROIs leak into the
@@ -42,9 +52,8 @@ val Dice ≈ 0.978), so inference needs no SAM2.
 | `lwbna_unet.py` | LWBNA-UNet (PyTorch, Sharma et al. 2022) |
 | `train_lwbna_brain.py` | train LWBNA-UNet (Dice + BCE) |
 | `lwbna_brain.py` | distilled LWBNA-UNet inference (brain mask) |
-| `yolo_brain.py`, `build_brain_dataset.py` | optional YOLO11-seg distillation variant |
 | `sir_analysis.py` | white-matter extraction, SIR, orbital SIR map, DICOM I/O |
-| `orbital_sir_map.py` | end-to-end CLI (`--sam2` / `--yolo` / `--lwbna`) |
+| `orbital_sir_map.py` | end-to-end CLI (`--lwbna` for production, `--sam2` for labelling) |
 | `models/brain_lwbna_best.pt` | trained LWBNA-UNet brain segmenter |
 | `Knowledge/` | distilled notes on the method, pitfalls, anatomy, architecture |
 
@@ -90,8 +99,17 @@ python train_lwbna_brain.py --data brain_seg_dataset --epochs 120 --out runs/lwb
 - STIR ≠ T2: models trained on T2 do not transfer (domain shift). See
   `Knowledge/stir-domain-shift-and-anatomy.md`.
 
+## License
+**Non-commercial / research use only.** See [`LICENSE`](LICENSE)
+(PolyForm Noncommercial License 1.0.0).
+
+The **LWBNA-UNet architecture is patented** (Sharma et al. 2022) and its
+**commercial use requires permission from the authors** — this is the binding
+constraint, so the model and code here are released for non-commercial research
+only. (SAM2 itself is Apache-2.0; it imposes no such restriction.)
+
 ## Credits
 - SIR method: Higashiyama et al., *Jpn J Ophthalmol* 2015.
 - LWBNA-UNet: Sharma et al., *Sci Rep* 12:8508 (2022); ref impl
   [parmanandsharma/Lightweight_AI](https://github.com/parmanandsharma/Lightweight_AI).
-- SAM2: Meta AI (`facebook/sam2-hiera-large`).
+- SAM2: Meta AI (`facebook/sam2-hiera-large`), Apache-2.0.

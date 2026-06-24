@@ -1,4 +1,4 @@
-# 大脳セグメンテーション: SAM2教師 → 蒸留(YOLO11n-seg / LWBNA-UNet)
+# 大脳セグメンテーション: SAM2教師 → LWBNA-UNetへ蒸留
 
 白質参照の前段で大脳を分離する。形態学では不可、SAM2で解決、軽量モデルへ蒸留。
 
@@ -12,15 +12,12 @@
 - `sam2_brain.py: SAM2BrainSegmenter.brain_mask(stir, z, strict=)`。strict=Trueで脳が無いスライスはNone（ラベリング用）。
 - 実行時 `HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1` でキャッシュ利用。
 
-## 蒸留（SAM2は重いので軽量モデルへ）
-2方式。いずれも `brain_mask(stir,z)` I/Fが同一で `orbital_sir_map.py` から差替可。
+## 蒸留（SAM2は重いので軽量モデルへ）→ LWBNA-UNet を採用
+**ピクセルマスク画像 + LWBNA-UNet(セマンティックセグ)** に蒸留。`brain_mask(stir,z)` I/Fは
+SAM2と共通で `orbital_sir_map.py --lwbna` から呼ぶ。val Dice≈0.978、輪郭が滑らか。
 
-| 方式 | ラベル形式 | 長所/短所 |
-|---|---|---|
-| YOLO11n-seg (`--yolo`) | ポリゴン | 速いが**点が少なく余計な領域が入る**。Mask mAP50≈0.85 |
-| **LWBNA-UNet (`--lwbna`)** | **ピクセルマスク画像** | 輪郭が滑らか。val Dice≈0.978。採用 |
-
-→ ポリゴンの粗さを避けるため **ピクセルマスク + LWBNA-UNet(セマンティックセグ)** を採用。
+> 補足: 初期に YOLO11n-seg(ポリゴン)も試したが、ポリゴンの点が少なく余計な領域が入るため
+> 不採用。最終的にピクセルマスクの LWBNA-UNet を使う。
 
 ## SAM2ラベルのQC + 手動キュレーション（必須）
 SAM2にも失敗マスクがある（whole-head/片側漏れ/断片化）。

@@ -1,0 +1,44 @@
+Non-Commercial Research License
+================================
+
+Copyright (c) 2026 ykitaguchi77
+
+This software and the accompanying trained model weights ("the Work") are made
+available for NON-COMMERCIAL research and educational use only.
+
+1. Grant of rights
+   Subject to the terms below, you are granted a worldwide, royalty-free,
+   non-exclusive license to use, copy, modify, and redistribute the Work and
+   derivative works, FOR NON-COMMERCIAL PURPOSES ONLY.
+
+2. Non-commercial purposes
+   "Non-commercial" means not primarily intended for or directed toward
+   commercial advantage or monetary compensation. Permitted uses include
+   academic research, teaching, personal study, and evaluation. Use by or for a
+   commercial entity in the course of its business is NOT permitted under this
+   license without separate written permission (see section 5).
+
+3. Attribution
+   Redistributions, with or without modification, must retain this license, the
+   copyright notice above, and credit to the original authors and to the works
+   cited in the README (Higashiyama et al. 2015; Sharma et al. 2022; SAM2).
+
+4. No warranty / no liability
+   THE WORK IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+   IMPLIED. IT IS NOT A MEDICAL DEVICE AND IS NOT INTENDED FOR CLINICAL
+   DIAGNOSIS OR TREATMENT. IN NO EVENT SHALL THE AUTHORS BE LIABLE FOR ANY
+   CLAIM, DAMAGES, OR OTHER LIABILITY ARISING FROM THE USE OF THE WORK.
+
+5. Patent notice (binding constraint)
+   The LWBNA-UNet architecture used here is patented (Sharma et al.,
+   Scientific Reports 12:8508, 2022). COMMERCIAL USE OF THE ARCHITECTURE OR THE
+   TRAINED MODEL REQUIRES PERMISSION FROM THE PATENT HOLDERS, independently of
+   this license.
+
+6. Third-party components
+   - SAM2 (Meta AI, "facebook/sam2-hiera-large") is licensed under Apache-2.0
+     and is NOT redistributed in this repository; obtain it separately.
+   - Other dependencies are governed by their own licenses.
+
+For commercial licensing inquiries, contact the copyright holder and the
+LWBNA-UNet patent holders.
