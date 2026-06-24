@@ -1,0 +1,30 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# Patient data — NEVER commit
+*.dcm
+*.nii
+*.nii.gz
+HANDAI_STIR_Coronal/
+brain_seg_dataset/
+brain_seg_review/
+brain_dataset/
+data/
+
+# Training artifacts
+runs/
+*.log
+outputs/
+
+# Models (the released model under models/ is force-added; ignore stray weights)
+/*.pt
+checkpoints/
+
+# OS / editor
+.DS_Store
+.vscode/
+.idea/
