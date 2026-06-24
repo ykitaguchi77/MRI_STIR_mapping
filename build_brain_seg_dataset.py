@@ -29,6 +29,8 @@ from sam2_brain import SAM2BrainSegmenter
 
 
 def list_series(d):
+    """List the distinct series in a DICOM folder, e.g. '100_20150904', from
+    filenames like '100_20150904_STIR_Coronal_07.dcm'."""
     names = set()
     for f in glob.glob(str(Path(d) / "*.dcm")):
         m = re.match(r"(.+)_STIR_Coronal_\d+\.dcm$", Path(f).name)
@@ -38,6 +40,8 @@ def list_series(d):
 
 
 def window8(sl):
+    """Window one STIR slice to 8-bit grayscale (clip at the 99.5th percentile,
+    scale to 0-255) — the same windowing the model and SAM2 see."""
     v = np.clip(sl, 0, np.percentile(sl, 99.5))
     return (v / max(v.max(), 1e-6) * 255).astype(np.uint8)
 
@@ -76,11 +80,13 @@ def qc_brain_mask(m: np.ndarray):
 
 def main():
     p = argparse.ArgumentParser(description="SAM2 -> LWBNA-UNet mask-image dataset")
-    p.add_argument("--dicom", required=True)
-    p.add_argument("--out", default="brain_seg_dataset")
-    p.add_argument("--limit", type=int, default=0)
-    p.add_argument("--val-frac", type=float, default=0.2)
-    p.add_argument("--max-anterior", type=int, default=6)
+    p.add_argument("--dicom", required=True, help="folder of STIR DICOM series")
+    p.add_argument("--out", default="brain_seg_dataset", help="output dataset dir")
+    p.add_argument("--limit", type=int, default=0, help="max series (0 = all)")
+    p.add_argument("--val-frac", type=float, default=0.2,
+                   help="fraction of patients held out for validation")
+    p.add_argument("--max-anterior", type=int, default=6,
+                   help="skip this many most-anterior slices (orbit, no cerebrum)")
     p.add_argument("--review", metavar="DIR",
                    help="also write an overlay preview per KEPT slice here, for "
                         "manual curation (delete bad previews, then run "
@@ -97,6 +103,8 @@ def main():
     series = list_series(args.dicom)
     if args.limit:
         series = series[:args.limit]
+    # Split by PATIENT (the id before the first '_'), so the same patient never
+    # appears in both train and val. Hold out every Nth patient as validation.
     patients = sorted({s.split("_")[0] for s in series})
     n_val = max(1, int(round(len(patients) * args.val_frac)))
     val_patients = set(patients[::max(1, len(patients) // n_val)][:n_val])
@@ -113,15 +121,16 @@ def main():
         except Exception as exc:  # noqa: BLE001
             print(f"[skip] {s}: {exc}"); continue
         kept = 0
+        # Only the posterior slices hold cerebrum; skip the anterior orbit ones.
         for z in range(vol.shape[2] - args.max_anterior):
             try:
-                bm = seg.brain_mask(vol, z, strict=True)
+                bm = seg.brain_mask(vol, z, strict=True)   # None if no cerebrum
             except Exception:  # noqa: BLE001
                 bm = None
             if bm is None:
                 continue
             m = bm[:, :, z]
-            ok, reason, _ = qc_brain_mask(m)
+            ok, reason, _ = qc_brain_mask(m)               # geometric sanity check
             if not ok:
                 n_drop += 1
                 drop_reasons[reason] = drop_reasons.get(reason, 0) + 1

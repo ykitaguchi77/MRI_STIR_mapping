@@ -32,6 +32,9 @@ class SAM2BrainSegmenter:
     # -- helpers -------------------------------------------------------------
     @staticmethod
     def _to_rgb(sl: np.ndarray):
+        """Turn one grayscale STIR slice into an 8-bit RGB image for SAM2.
+        Window to the 99.5th percentile so a few bright voxels don't wash out
+        the rest, scale to 0-255, and repeat the gray channel 3 times."""
         from PIL import Image
         v = np.clip(sl, 0, np.percentile(sl, 99.5))
         v = (v / max(v.max(), 1e-6) * 255).astype(np.uint8)
@@ -39,8 +42,10 @@ class SAM2BrainSegmenter:
 
     @staticmethod
     def _interior_point(sl: np.ndarray) -> tuple[float, float]:
-        """A point reliably inside the cerebrum: centroid of strongly-eroded
-        upper-head tissue (thin skull-base bridges erode away first)."""
+        """Pick one (x, y) point that is reliably inside the cerebrum, to prompt
+        SAM2 with. We erode the tissue hard so the thin skull-base bridge to the
+        face disappears, then take the centroid of the largest remaining blob in
+        the upper half of the head (that blob is the cerebrum)."""
         pos = sl[sl > 0]
         m = (sl > np.percentile(pos, 40)) & (sl < np.percentile(pos, 99))
         core = ndimage.binary_erosion(m, iterations=6)
@@ -76,6 +81,8 @@ class SAM2BrainSegmenter:
         sl = stir[:, :, slice_idx]
         img = self._to_rgb(sl)
         px, py = self._interior_point(sl)
+        # input_points nesting is (batch, image, points, xy); one positive point
+        # (label 1) means "include the region containing this point".
         inputs = self.processor(images=img,
                                 input_points=[[[[px, py]]]],
                                 input_labels=[[[1]]],
@@ -86,6 +93,9 @@ class SAM2BrainSegmenter:
             out.pred_masks.cpu(), inputs["original_sizes"])[0][0].numpy() > 0.5
         scores = out.iou_scores.cpu().numpy().reshape(-1)
 
+        # SAM2 returns 3 candidate masks. Choose the best valid cerebrum: it must
+        # be brain-sized (area fraction in range) and sit in the upper head. This
+        # rejects the "whole head" (too big) and "tiny speck" (too small) masks.
         H = sl.shape[0]
         total = sl.size
         best, best_score = None, -1.0
@@ -94,10 +104,10 @@ class SAM2BrainSegmenter:
             frac = area / total
             if not (min_area_frac <= frac <= max_area_frac):
                 continue
-            cy = np.where(masks[k])[0].mean() if area else H
-            if cy >= 0.60 * H:           # brain should sit in the upper head
+            cy = np.where(masks[k])[0].mean() if area else H   # mask centroid row
+            if cy >= 0.60 * H:           # reject masks centred low (face/orbit)
                 continue
-            if scores[k] > best_score:
+            if scores[k] > best_score:   # keep the highest-confidence valid mask
                 best, best_score = masks[k], scores[k]
         if best is None:
             if strict:                   # no valid cerebrum on this slice -> skip

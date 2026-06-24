@@ -63,9 +63,9 @@ def auto_orbit_and_brain_slices(stir: np.ndarray):
     from scipy import ndimage
 
     nz = stir.shape[2]
-    hi = np.percentile(stir[stir > 0], 98)
-    globe_score = np.zeros(nz)
-    tissue_area = np.zeros(nz)
+    hi = np.percentile(stir[stir > 0], 98)      # "very bright" threshold
+    globe_score = np.zeros(nz)                  # how eyeball-like each slice is
+    tissue_area = np.zeros(nz)                  # how much soft tissue each slice has
     for z in range(nz):
         sl = stir[:, :, z]
         bright = sl > hi
@@ -73,12 +73,14 @@ def auto_orbit_and_brain_slices(stir: np.ndarray):
         lbl, n = ndimage.label(bright)
         if n:
             sizes = ndimage.sum(np.ones_like(lbl), lbl, range(1, n + 1))
-            globe_score[z] = np.sort(sizes)[-2:].sum()  # two largest bright blobs
+            # On orbit slices the two eyeballs are the two largest bright blobs.
+            globe_score[z] = np.sort(sizes)[-2:].sum()
         tissue_area[z] = (sl > np.percentile(sl[sl > 0], 55)).sum()
 
+    # Orbit = the slice with the strongest eyeball signal and its neighbours.
     orbit_center = int(np.argmax(globe_score))
     orbit = [z for z in range(nz) if abs(z - orbit_center) <= 2]
-    # brain = tissue-rich slices at least 4 away from the orbit block
+    # Brain = tissue-rich slices well away from the orbit block (the cerebrum).
     brain = [z for z in range(nz)
              if min(abs(z - o) for o in orbit) >= 4
              and tissue_area[z] > 0.5 * tissue_area.max()]

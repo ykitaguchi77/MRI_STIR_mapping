@@ -9,9 +9,10 @@ Computes the SIR used to grade orbital inflammation in Thyroid Eye Disease
                   mean signal of brain WHITE MATTER on STIR
 
 White matter is used as an internal reference because its STIR signal is stable
-across patients/scanners. The white-matter reference is extracted automatically
-from a brain ROI by reading the intensity HISTOGRAM and taking the band between
-the two valleys that bracket the dominant parenchymal (white-matter) peak.
+across patients and scanners. The reference is found automatically: inside a
+brain ROI we build the intensity histogram and pick the white-matter peak (the
+LOWEST-intensity tissue peak — white matter is darker than gray matter on
+STIR/T2), then average the voxels in the band around it.
 
 Inputs
 ------
@@ -157,14 +158,17 @@ def extract_white_matter_reference(
     """
     Extract the white-matter reference signal from a brain ROI.
 
-    Method (matches the "place ROI on brain, read histogram boundaries" approach):
-      1. Collect voxel intensities inside the ROI, clip the extreme tails
-         (background / CSF / edema) at the given percentiles.
-      2. Build a smoothed histogram. On STIR/T2 the brain parenchyma forms the
-         dominant peak; white matter sits on its lower-intensity side.
-      3. Take the band between the two histogram VALLEYS that bracket that peak;
-         voxels inside the band are the white-matter population.
-      4. Reference signal = mean of the white-matter voxels.
+    Idea: "place an ROI on the brain, then read the histogram to find white
+    matter." Steps:
+      1. Take the voxel intensities inside the ROI and clip the extreme tails
+         (very dark background, very bright CSF/edema) at the given percentiles.
+      2. Build a smoothed histogram and find its peaks. White matter is the
+         LOWEST-intensity peak (on STIR/T2 white matter is darker than gray
+         matter; gray matter can be the *tallest* peak on cortex-heavy slices,
+         so we must not just take the tallest one).
+      3. The white-matter band runs from the valley on the left of that peak to
+         the valley on its right (the right valley is the WM/GM boundary).
+      4. Reference signal = mean of the voxels whose intensity is in that band.
 
     Returns a dict with the reference value, the WM voxel mask, the (low, high)
     intensity boundaries and the histogram (for plotting / QC).

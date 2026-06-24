@@ -29,16 +29,18 @@ def main():
     data = Path(args.data)
     review = Path(args.review)
 
-    # stems the user KEPT (preview still present): "<split>__<stem>"
+    # Previews the user KEPT (still present in the review folder): "<split>__<stem>".
+    # Anything whose preview was deleted is treated as a reject.
     kept = {Path(f).stem for f in glob.glob(str(review / "*.png"))}
 
     removed = keptn = 0
     for split in ("train", "val"):
         for img in glob.glob(str(data / "images" / split / "*.png")):
             stem = Path(img).stem
-            if f"{split}__{stem}" in kept:
+            if f"{split}__{stem}" in kept:     # preview kept -> keep the pair
                 keptn += 1
                 continue
+            # preview was deleted -> drop this image/mask pair
             mask = data / "masks" / split / f"{stem}.png"
             removed += 1
             print(f"[remove] {split}/{stem}")

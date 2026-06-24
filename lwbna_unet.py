@@ -89,13 +89,17 @@ class LWBNAUNet(nn.Module):
         self.head = nn.Conv2d(f, num_classes, 3, padding=1)
 
     def forward(self, x):
+        # Encoder: conv block at each level, save its output for the skip
+        # connection, then halve the spatial size.
         skips = []
         for blk in self.enc:
             c = blk(x)
             skips.append(c)
             x = self.drop(F.max_pool2d(c, 2))
 
-        # bottleneck narrowing
+        # Bottleneck "narrowing": squeeze the channels f -> f/2 -> f/4 -> f/8
+        # (attention each step) to distil the features, then widen back to f and
+        # add `xe1` (the first, widest bottleneck feature) as a residual.
         xe1 = None
         for i, (conv, att) in enumerate(zip(self.mid_convs, self.mid_attn)):
             x = F.relu(conv(x))
@@ -106,7 +110,8 @@ class LWBNAUNet(nn.Module):
         x = x + xe1
         x = self.mid_post(x)
 
-        # decoder
+        # Decoder: upsample, ADD the matching encoder skip (LWBNA uses add, not
+        # concat), then a conv block. Skips are consumed in reverse order.
         for i, blk in enumerate(self.dec):
             x = F.interpolate(x, scale_factor=2, mode="nearest")
             x = x + skips[self.depth - 1 - i]
