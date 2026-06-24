@@ -1,0 +1,15 @@
+# Core
+numpy
+scipy
+opencv-python
+matplotlib
+nibabel
+pydicom
+
+# Deep learning
+torch>=2.6
+torchvision
+
+# Brain segmentation
+transformers>=5.12      # SAM2 (facebook/sam2-hiera-large) for labelling/teacher
+ultralytics>=8.4        # optional: YOLO11-seg distillation variant
