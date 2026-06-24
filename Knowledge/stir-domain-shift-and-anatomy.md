@@ -24,6 +24,6 @@ TOM500(T2冠状)で学習した外眼筋セグメンテーション(U-Net/DeepLa
 - `--model` に `vanilla_unet` 選択肢が無い（best重みは vanilla_unet 系が多い点に注意）。
 
 ## 環境
-- 実行は必ず `MRI_TOM/venv`（python3.11.5 / torch2.8+cu126 / pydicom / transformers / ultralytics / smp / cv2 / scipy）。素のpythonには pydicom/torch 等が無い。
+- 実行は必ず venv（python3.11.5 / torch2.8+cu126 / pydicom / transformers / cv2 / scipy）。素のpythonには pydicom/torch 等が無い。
 - SAM2/transformers は `HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1` でHFキャッシュ利用。
 - 関連: [[stir-sir-pipeline]] [[brain-segmentation-distillation]]

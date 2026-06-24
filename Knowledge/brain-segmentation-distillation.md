@@ -12,12 +12,9 @@
 - `sam2_brain.py: SAM2BrainSegmenter.brain_mask(stir, z, strict=)`。strict=Trueで脳が無いスライスはNone（ラベリング用）。
 - 実行時 `HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1` でキャッシュ利用。
 
-## 蒸留（SAM2は重いので軽量モデルへ）→ LWBNA-UNet を採用
+## 蒸留（SAM2は重いので軽量モデルへ）→ LWBNA-UNet
 **ピクセルマスク画像 + LWBNA-UNet(セマンティックセグ)** に蒸留。`brain_mask(stir,z)` I/Fは
 SAM2と共通で `orbital_sir_map.py --lwbna` から呼ぶ。val Dice≈0.978、輪郭が滑らか。
-
-> 補足: 初期に YOLO11n-seg(ポリゴン)も試したが、ポリゴンの点が少なく余計な領域が入るため
-> 不採用。最終的にピクセルマスクの LWBNA-UNet を使う。
 
 ## SAM2ラベルのQC + 手動キュレーション（必須）
 SAM2にも失敗マスクがある（whole-head/片側漏れ/断片化）。
