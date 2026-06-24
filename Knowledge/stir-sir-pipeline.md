@@ -35,7 +35,7 @@ $PY orbital_sir_map.py --dicom HANDAI_STIR_Coronal --series <症例> \
     --lwbna brain_lwbna_best.pt --plot out.png --save-nifti out.nii.gz
 ```
 - `--brain-slices`/`--orbit-slices` 省略時は globe検出で自動推定（要QC）。
-- 実行は必ず `MRI_TOM/venv`（torch/pydicom/transformers/ultralytics入り）。
+- 実行は必ず venv（torch/pydicom/transformers/cv2入り）。
 
 ## 重要な前提
 - **入力STIRは生信号**（min-max/z-score正規化しない）。SIRは生信号の比のため。
