@@ -26,13 +26,14 @@ val Dice ≈ 0.978), so inference needs no SAM2.
 
 ## Example results
 
-LWBNA-UNet cerebrum mask merged onto coronal STIR (brain slices):
+**Brain segmentation** — LWBNA-UNet cerebrum mask merged onto coronal STIR:
 
 ![brain mask merged on STIR](assets/example_brain_mask.png)
 
-Resulting orbital SIR map (top: STIR, bottom: SIR heat-map, white = SIR 2.0 contour):
+**White-matter separation** — white matter (blue) extracted within the brain mask
+(magenta) by the low-intensity histogram peak; its mean is the SIR reference:
 
-![orbital SIR map](assets/example_sir_map.png)
+![white matter separation](assets/example_white_matter.png)
 
 ## Why this design
 - **Morphological skull-stripping fails** on coronal STIR: the brain stays
