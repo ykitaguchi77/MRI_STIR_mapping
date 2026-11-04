@@ -55,6 +55,8 @@ val Dice ≈ 0.978), so inference needs no SAM2.
 | `lwbna_brain.py` | distilled LWBNA-UNet inference (brain mask) |
 | `sir_analysis.py` | white-matter extraction, SIR, orbital SIR map, DICOM I/O |
 | `orbital_sir_map.py` | end-to-end CLI (`--lwbna` for production, `--sam2` for labelling) |
+| `wm_gmm.py` | white-matter intensity on any chosen slice: histogram WM peak checked by a tied 1-D GMM; outputs the used / WM pixel masks |
+| `validate_wm_hybrid.py` | compares `wm_gmm` with manual ellipse ROIs on the same slice |
 | `models/brain_lwbna_best.pt` | trained LWBNA-UNet brain segmenter |
 | `Knowledge/` | distilled notes on the method, pitfalls, anatomy, architecture |
 
@@ -86,6 +88,16 @@ python curate_brain_dataset.py --data brain_seg_dataset --review brain_seg_revie
 # 4. (re-split into train/val by patient, then) train
 python train_lwbna_brain.py --data brain_seg_dataset --epochs 120 --out runs/lwbna_brain
 ```
+
+### White-matter intensity on a chosen slice
+```bash
+python wm_gmm.py --dicom <STIR_DICOM_dir> --series <prefix> --slice 14 --out wm_slice14
+```
+Brain mask (LWBNA, eroded 3 px) -> robust outlier rule (3.5 MAD, log scale) ->
+lowest histogram peak, checked against the tied-GMM WM mode; if they differ by
+more than 15% the GMM value is used and flagged. Writes a QC image (pixels used
+and the WM class) and the masks. Against manual ROIs on the same slice (n=19):
++0.2 ± 4.1%. Details: `Knowledge/white-matter-intensity-any-slice.md`.
 
 ## Model card — `models/brain_lwbna_best.pt`
 - Architecture: LWBNA-UNet (2.95M params), input 1×256×256, output 1 (binary cerebrum).
