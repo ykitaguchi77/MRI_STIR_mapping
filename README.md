@@ -55,8 +55,8 @@ val Dice ≈ 0.978), so inference needs no SAM2.
 | `lwbna_brain.py` | distilled LWBNA-UNet inference (brain mask) |
 | `sir_analysis.py` | white-matter extraction, SIR, orbital SIR map, DICOM I/O |
 | `orbital_sir_map.py` | end-to-end CLI (`--lwbna` for production, `--sam2` for labelling) |
-| `wm_gmm.py` | white-matter intensity on any chosen slice: histogram WM peak checked by a tied 1-D GMM; outputs the used / WM pixel masks |
-| `validate_wm_hybrid.py` | compares `wm_gmm` with manual ellipse ROIs on the same slice |
+| `wm_gmm.py` | white-matter value on one chosen slice (histogram peak, with a curve-fit safety check) — see the section below |
+| `validate_wm_hybrid.py` | checks `wm_gmm.py` against a reader's elliptical ROIs on the same slice |
 | `models/brain_lwbna_best.pt` | trained LWBNA-UNet brain segmenter |
 | `Knowledge/` | distilled notes on the method, pitfalls, anatomy, architecture |
 
@@ -89,31 +89,59 @@ python curate_brain_dataset.py --data brain_seg_dataset --review brain_seg_revie
 python train_lwbna_brain.py --data brain_seg_dataset --epochs 120 --out runs/lwbna_brain
 ```
 
-### White-matter intensity on a chosen slice
+## White-matter intensity on a chosen slice (`wm_gmm.py`)
+Gives the white-matter signal of **one slice you choose** — for example the
+slice where you measure the extraocular muscles, so that numerator and
+denominator of the SIR come from the same slice. This is separate from the
+original method above (`sir_analysis.py`, unchanged), which averages a band of
+the histogram over several deep brain slices.
+
 ```bash
 python wm_gmm.py --dicom <STIR_DICOM_dir> --series <prefix> --slice 14 --out wm_slice14
+# -> prints the white-matter value; writes wm_slice14.png and wm_slice14_masks.npz
 ```
-Brain mask (LWBNA, eroded 3 px) -> robust outlier rule (3.5 MAD, log scale) ->
-lowest histogram peak, checked against the tied-GMM WM mode; if they differ by
-more than 15% the GMM value is used and flagged. Against manual ROIs on the
-same slice (n=19): +0.2 ± 4.1%. Details: `Knowledge/white-matter-intensity-any-slice.md`.
+In Python: `wm_gmm.wm_reference_hybrid(slice_2d, brain_mask_2d)["wm"]`.
 
-Outputs: `<out>.png` (QC image) and `<out>_masks.npz`:
+**How the value is found**
+1. **Brain pixels.** The brain mask (LWBNA) is shrunk by 3 pixels so that the
+   bright fluid (CSF) at the brain surface is left out.
+2. **Drop extreme pixels.** Pixels far from the typical brightness of the slice
+   are removed (more than 3.5 robust standard deviations from the median, on a
+   log scale). Unlike cutting a fixed 1% or 5%, nothing is removed when there
+   is nothing extreme.
+3. **Main answer: the white-matter peak.** In a brightness histogram of the
+   brain, white matter is the darkest hump (white matter < grey matter < CSF on
+   STIR). The position of the top of that hump — the most common white-matter
+   brightness — is the value. This matches where a reader puts an ROI.
+4. **Safety check: a curve fit.** The same histogram is also fitted as the sum
+   of three bell curves (white matter, grey matter, CSF; a "Gaussian mixture
+   model", GMM). The three curves are given the same width, which stops the
+   fit from going wrong. The top of the white-matter curve is a second
+   estimate.
+5. **Choose.** If the two estimates agree within 15%, the peak (step 3) is
+   used. If not, the peak has usually landed on grey matter — this happens on
+   slices with very little white matter, where white matter forms no hump of
+   its own — so the curve-fit value (step 4) is used instead and
+   `fallback = True` is reported. Look at the QC image for those slices.
+
+Checked against a reader's elliptical ROIs on the same slice in 19 patients:
+the value differs from the reader's by +0.2 ± 4.1% on average (largest 8.6%).
+More detail: `Knowledge/white-matter-intensity-any-slice.md`.
+
+**Outputs** (`<out>_masks.npz`, and the same keys from `wm_reference_hybrid`)
 
 | key | content |
 |---|---|
-| `wm` | white-matter intensity of the slice (the value to use) |
-| `fallback` | `False` = histogram peak used, `True` = GMM value used (check the QC image) |
-| `used_mask` | pixels fed to the estimate (eroded brain mask, outliers removed) — yellow in the QC image |
-| `wm_mask` | **for display**: GMM white-matter class — blue in the QC image |
-| `peak_mask` | pixels under the histogram peak (half-maximum width) |
+| `wm` | **the white-matter value to use** |
+| `fallback` | `False` = peak used (step 3); `True` = curve-fit value used (step 4) — check the image |
+| `used_mask` | pixels that went into the calculation (yellow in the QC image) |
+| `wm_mask` | white-matter area for display (blue in the QC image) |
+| `peak_mask` | pixels whose brightness lies in the top half of the white-matter peak |
 
-> **Note on the masks.** `wm_mask` is a display convenience: it is always the
-> GMM white-matter class, even when the reported `wm` value is the histogram
-> peak. The peak value is the mode of the histogram, not the mean of any pixel
-> set; `peak_mask` is its literal basis but is ragged at the white-matter edge,
-> so it is saved but not drawn. The mean of `wm_mask` pixels is **not** the
-> reported value.
+> **The blue area is for display only.** It is the white-matter area from the
+> curve fit (step 4), shown whichever value was chosen, because it looks clean.
+> The value `wm` is the top of a histogram hump, not an average of pixels, so
+> averaging the blue pixels does **not** give `wm`. Use `wm` as it is.
 
 ## Model card — `models/brain_lwbna_best.pt`
 - Architecture: LWBNA-UNet (2.95M params), input 1×256×256, output 1 (binary cerebrum).
