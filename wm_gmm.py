@@ -181,8 +181,18 @@ def histogram_wm_peak(v: np.ndarray, n_bins: int = 128, smooth_sigma: float = 2.
     return float(centers[i]), (float(edges[a]), float(edges[b + 1]))
 
 
+def dark_fraction(v: np.ndarray, rel: float = 0.35) -> float:
+    """QC for non-brain tissue in the ROI: % of pixels darker than `rel` x the
+    ROI median. Inside the brain almost nothing is that dark (<1.5% in all clean
+    ROIs tested); air, bone and fat-suppressed fat of the sinuses, orbit and
+    scalp are, and they are darker than white matter, so they would be taken
+    for it."""
+    return float(100 * np.mean(v < rel * np.median(v)))
+
+
 def wm_reference_hybrid(sl: np.ndarray, brain2d: np.ndarray, erode: int = 3,
-                        max_disagree: float = 0.15, mad_k: float | None = 3.5) -> dict:
+                        max_disagree: float = 0.15, mad_k: float | None = 3.5,
+                        max_dark_pct: float = 2.0) -> dict:
     """Histogram WM peak, falling back to the tied-GMM mode when the two differ
     by more than `max_disagree` (relative). Returns the chosen value, both
     estimates, `fallback` (True = GMM used; worth a look in QC) and masks:
@@ -194,9 +204,11 @@ def wm_reference_hybrid(sl: np.ndarray, brain2d: np.ndarray, erode: int = 3,
     peak, (lo, hi) = histogram_wm_peak(brain_values(sl, brain2d, erode), return_range=True)
     g = wm_reference(sl, brain2d, mode="tied", erode=erode, mad_k=mad_k)
     fallback = abs(peak / g["wm_mode"] - 1) > max_disagree
+    dark = dark_fraction(sl[g["used_mask"]])
     peak_mask = g["used_mask"] & (sl >= lo) & (sl <= hi)
     return {"wm": g["wm_mode"] if fallback else peak, "wm_peak": peak,
             "wm_gmm": g["wm_mode"], "fallback": bool(fallback), "peak_range": (lo, hi),
+            "dark_pct": dark, "contaminated": bool(dark > max_dark_pct),
             "used_mask": g["used_mask"],
             "wm_mask": g["wm_mask"], "peak_mask": peak_mask, "gmm": g}
 
@@ -225,13 +237,17 @@ def main():
     print(f"slice {z}: WM = {r['wm']:.1f}  ({'GMM fallback' if r['fallback'] else 'histogram peak'}; "
           f"peak {r['wm_peak']:.1f}, GMM mode {r['wm_gmm']:.1f}; "
           f"{int(r['used_mask'].sum())} pixels used, {int(r['wm_mask'].sum())} in the WM class)")
+    if r["contaminated"]:
+        print(f"WARNING: {r['dark_pct']:.1f}% of the pixels are very dark - the ROI probably "
+              "includes sinus / orbit / scalp. Do not use this value.")
     if args.out:
         import matplotlib
         matplotlib.use("Agg")
         import matplotlib.pyplot as plt
         np.savez_compressed(f"{args.out}_masks.npz", used_mask=r["used_mask"],
                             wm_mask=r["wm_mask"], peak_mask=r["peak_mask"],
-                            slice=z, wm=r["wm"],
+                            slice=z, wm=r["wm"], dark_pct=r["dark_pct"],
+                            contaminated=r["contaminated"],
                             fallback=r["fallback"])
         fig, ax = plt.subplots(1, 2, figsize=(10, 5))
         for a in ax:

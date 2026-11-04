@@ -147,9 +147,21 @@ More detail: `Knowledge/white-matter-intensity-any-slice.md`.
 |---|---|
 | `wm` | **the white-matter value to use** |
 | `fallback` | `False` = peak used (step 3); `True` = curve-fit value used (step 4) — check the image |
+| `contaminated` | `True` = the ROI probably includes sinus / orbit / scalp — **do not use `wm`** |
+| `dark_pct` | % of ROI pixels darker than 0.35 × the ROI median (the basis of `contaminated`, limit 2%) |
 | `used_mask` | pixels that went into the calculation (yellow in the QC image) |
 | `wm_mask` | white-matter area for display (blue in the QC image) |
 | `peak_mask` | pixels whose brightness lies in the top half of the white-matter peak |
+
+**Other ROI shapes.** Instead of the brain mask you can pass any region, e.g. a
+rectangle drawn inside the cerebrum: a central rectangle or one hemisphere gave
+the same accuracy as the brain mask. Two rules:
+- **Stay inside the brain.** On STIR, air, bone and fat-suppressed fat (sinuses,
+  orbit, scalp) are darker than white matter and are taken for it (−50% or
+  worse). `contaminated` catches this: in tests it flagged 80 of 84 ROIs that
+  were off by more than 10%, and none of the clean ROIs.
+- **Not too small.** The method expects white matter, grey matter and CSF in
+  the region; a 30 × 30-pixel box was unreliable.
 
 > **The blue area is for display only.** It is the white-matter area from the
 > curve fit (step 4), shown whichever value was chosen, because it looks clean.
