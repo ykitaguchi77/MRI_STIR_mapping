@@ -51,34 +51,95 @@ def parse_slices(spec: str) -> list[int]:
     return out
 
 
-def auto_orbit_and_brain_slices(stir: np.ndarray):
+def detect_globes(stir: np.ndarray, min_area: int = 150, max_area: int = 3000,
+                  min_circularity: float = 0.4, bright_pct: float = 96.0):
     """
-    Best-effort split into (brain_slices, orbit_slices).
+    Per-slice eyeball score. The globes are the two very bright, ROUND blobs
+    that sit symmetrically about the midline at the same height. Requiring
+    roundness + a symmetric pair keeps bright CSF / ventricles / sinus mucosa on
+    brain slices from being mistaken for eyeballs.
 
-    Orbit slices are detected by the presence of the eyeballs — very bright,
-    compact blobs (globe signal is high on STIR). The remaining tissue-bearing
-    slices furthest from the orbit block are used for the brain reference.
-    Heuristic — print the choice and verify with the QC figure.
+    Returns (globe_score[z], globe_center_slice or None).
     """
     from scipy import ndimage
 
     nz = stir.shape[2]
-    hi = np.percentile(stir[stir > 0], 98)      # "very bright" threshold
-    globe_score = np.zeros(nz)                  # how eyeball-like each slice is
+    H, W = stir.shape[:2]
+    hi_global = np.percentile(stir[stir > 0], bright_pct)
+    score = np.zeros(nz)
+    for z in range(nz):
+        sl = stir[:, :, z]
+        pos = sl[sl > 0]
+        if pos.size == 0:
+            continue
+        # a per-slice threshold catches globes that are dim relative to the
+        # whole volume (coil sensitivity); the global one guards bright slices
+        hi = min(hi_global, np.percentile(pos, bright_pct))
+        bright = ndimage.binary_opening(sl > hi, iterations=1)
+        bright = ndimage.binary_fill_holes(bright)
+        lbl, n = ndimage.label(bright)
+        if n < 2:
+            continue
+        blobs = []
+        for i in range(1, n + 1):
+            m = lbl == i
+            area = int(m.sum())
+            if not (min_area <= area <= max_area):
+                continue
+            # circularity = 4*pi*A / P^2 (perimeter from the eroded boundary)
+            perim = int((m & ~ndimage.binary_erosion(m)).sum())
+            circ = 4 * np.pi * area / max(perim, 1) ** 2
+            if circ < min_circularity:
+                continue
+            ys, xs = np.where(m)
+            blobs.append((area, circ, ys.mean(), xs.mean()))
+        # best symmetric pair: similar height, on opposite sides of the midline,
+        # similar area
+        best = 0.0
+        for a in range(len(blobs)):
+            for b in range(a + 1, len(blobs)):
+                A, cA, yA, xA = blobs[a]
+                B, cB, yB, xB = blobs[b]
+                if abs(yA - yB) > 0.08 * H:
+                    continue
+                if (xA - W / 2) * (xB - W / 2) >= 0:          # same side
+                    continue
+                if min(A, B) / max(A, B) < 0.3:
+                    continue
+                sep = abs(xA - xB)
+                # globes are ~60 mm apart; the lateral ventricles are a bright,
+                # round, symmetric pair too but sit close to the midline
+                if not (0.22 * W <= sep <= 0.5 * W):
+                    continue
+                best = max(best, (A + B) * (cA + cB) / 2)
+        score[z] = best
+    if score.max() == 0:
+        return score, None
+    return score, int(np.argmax(score))
+
+
+def auto_orbit_and_brain_slices(stir: np.ndarray):
+    """
+    Best-effort split into (brain_slices, orbit_slices).
+
+    Orbit slices are detected by the eyeballs (two bright, round, symmetric
+    blobs, see detect_globes). The tissue-rich slices furthest from the orbit
+    block are used for the brain reference. Heuristic — print the choice and
+    verify with the QC figure.
+    """
+    nz = stir.shape[2]
     tissue_area = np.zeros(nz)                  # how much soft tissue each slice has
     for z in range(nz):
         sl = stir[:, :, z]
-        bright = sl > hi
-        bright = ndimage.binary_opening(bright, iterations=1)
-        lbl, n = ndimage.label(bright)
-        if n:
-            sizes = ndimage.sum(np.ones_like(lbl), lbl, range(1, n + 1))
-            # On orbit slices the two eyeballs are the two largest bright blobs.
-            globe_score[z] = np.sort(sizes)[-2:].sum()
-        tissue_area[z] = (sl > np.percentile(sl[sl > 0], 55)).sum()
+        pos = sl[sl > 0]
+        tissue_area[z] = (sl > np.percentile(pos, 55)).sum() if pos.size else 0
 
-    # Orbit = the slice with the strongest eyeball signal and its neighbours.
-    orbit_center = int(np.argmax(globe_score))
+    globe_score, orbit_center = detect_globes(stir)
+    if orbit_center is None:
+        # fall back to the old brightness-only rule
+        hi = np.percentile(stir[stir > 0], 98)
+        orbit_center = int(np.argmax([(stir[:, :, z] > hi).sum() for z in range(nz)]))
+        print("[auto] WARNING: no eyeball pair found; orbit slice from brightness only")
     orbit = [z for z in range(nz) if abs(z - orbit_center) <= 2]
     # Brain = tissue-rich slices well away from the orbit block (the cerebrum).
     brain = [z for z in range(nz)

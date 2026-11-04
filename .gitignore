@@ -28,3 +28,9 @@ checkpoints/
 .DS_Store
 .vscode/
 .idea/
+
+# Manual WM-ROI validation: QC images contain patient slices
+# (case IDs with exam dates, patient slices) — keep the whole result folders local
+wm_manual_roi/
+wm_manual_roi_orbit/
+.playwright-mcp/
