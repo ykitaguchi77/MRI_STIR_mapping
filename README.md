@@ -95,9 +95,25 @@ python wm_gmm.py --dicom <STIR_DICOM_dir> --series <prefix> --slice 14 --out wm_
 ```
 Brain mask (LWBNA, eroded 3 px) -> robust outlier rule (3.5 MAD, log scale) ->
 lowest histogram peak, checked against the tied-GMM WM mode; if they differ by
-more than 15% the GMM value is used and flagged. Writes a QC image (pixels used
-and the WM class) and the masks. Against manual ROIs on the same slice (n=19):
-+0.2 ± 4.1%. Details: `Knowledge/white-matter-intensity-any-slice.md`.
+more than 15% the GMM value is used and flagged. Against manual ROIs on the
+same slice (n=19): +0.2 ± 4.1%. Details: `Knowledge/white-matter-intensity-any-slice.md`.
+
+Outputs: `<out>.png` (QC image) and `<out>_masks.npz`:
+
+| key | content |
+|---|---|
+| `wm` | white-matter intensity of the slice (the value to use) |
+| `fallback` | `False` = histogram peak used, `True` = GMM value used (check the QC image) |
+| `used_mask` | pixels fed to the estimate (eroded brain mask, outliers removed) — yellow in the QC image |
+| `wm_mask` | **for display**: GMM white-matter class — blue in the QC image |
+| `peak_mask` | pixels under the histogram peak (half-maximum width) |
+
+> **Note on the masks.** `wm_mask` is a display convenience: it is always the
+> GMM white-matter class, even when the reported `wm` value is the histogram
+> peak. The peak value is the mode of the histogram, not the mean of any pixel
+> set; `peak_mask` is its literal basis but is ragged at the white-matter edge,
+> so it is saved but not drawn. The mean of `wm_mask` pixels is **not** the
+> reported value.
 
 ## Model card — `models/brain_lwbna_best.pt`
 - Architecture: LWBNA-UNet (2.95M params), input 1×256×256, output 1 (binary cerebrum).

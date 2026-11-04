@@ -27,6 +27,9 @@ CLI — white-matter intensity on one chosen slice:
   python wm_gmm.py --dicom <STIR_DICOM_dir> --series <prefix> --slice 14 --out wm_slice14
 writes <out>.png (slice with used pixels / WM class) and <out>_masks.npz.
 
+Note: `wm_mask` is for display only — always the GMM WM class, even when the
+reported value is the histogram peak. Its pixel mean is not the reported value.
+
 This is an alternative to the original band-mean method in sir_analysis.py,
 which is left unchanged. Validation: Knowledge/manual-vs-auto-white-matter.md.
 """
