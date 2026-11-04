@@ -152,31 +152,51 @@ def wm_reference(sl: np.ndarray, brain2d: np.ndarray, mode: str = "tied",
             "used_mask": used, "wm_mask": wm_mask}
 
 
-def histogram_wm_peak(v: np.ndarray, n_bins: int = 128, smooth_sigma: float = 2.0) -> float:
+def histogram_wm_peak(v: np.ndarray, n_bins: int = 128, smooth_sigma: float = 2.0,
+                      return_range: bool = False):
     """Simple mode: lowest prominent peak of the smoothed brain histogram
     (same peak search as sir_analysis.extract_white_matter_reference, but the
-    peak position is returned instead of the valley-to-valley band mean)."""
+    peak position is returned instead of the valley-to-valley band mean).
+    With return_range=True also returns (lo, hi): the half-maximum width of that
+    peak, i.e. the intensities of the pixels that make up the peak."""
     lo, hi = np.percentile(v, (1.0, 99.0))
     core = v[(v >= lo) & (v <= hi)]
     hist, edges = np.histogram(core, bins=n_bins, range=(lo, hi))
     centers = 0.5 * (edges[:-1] + edges[1:])
     hs = gaussian_filter1d(hist.astype(float), smooth_sigma)
     peaks, _ = find_peaks(hs, prominence=hs.max() * 0.08, distance=max(3, n_bins // 20))
-    return float(centers[peaks[0]] if len(peaks) else centers[np.argmax(hs)])
+    i = int(peaks[0] if len(peaks) else np.argmax(hs))
+    if not return_range:
+        return float(centers[i])
+    half = hs[i] / 2
+    a = i
+    while a > 0 and hs[a - 1] >= half:
+        a -= 1
+    b = i
+    while b < n_bins - 1 and hs[b + 1] >= half:
+        b += 1
+    return float(centers[i]), (float(edges[a]), float(edges[b + 1]))
 
 
 def wm_reference_hybrid(sl: np.ndarray, brain2d: np.ndarray, erode: int = 3,
                         max_disagree: float = 0.15, mad_k: float | None = 3.5) -> dict:
     """Histogram WM peak, falling back to the tied-GMM mode when the two differ
     by more than `max_disagree` (relative). Returns the chosen value, both
-    estimates, `fallback` (True = GMM used; worth a look in QC) and the masks
-    `used_mask` / `wm_mask` (see wm_reference) to show which pixels it rests on."""
-    peak = histogram_wm_peak(brain_values(sl, brain2d, erode))
+    estimates, `fallback` (True = GMM used; worth a look in QC) and masks:
+      used_mask  pixels fed to the estimate (eroded brain, MAD inliers)
+      wm_mask    pixels the chosen value rests on: the pixels under the
+                 histogram peak (half-maximum width) when the peak is used,
+                 the GMM WM class when the GMM value is used
+      peak_mask / gmm_wm_mask  both, regardless of which was chosen"""
+    peak, (lo, hi) = histogram_wm_peak(brain_values(sl, brain2d, erode), return_range=True)
     g = wm_reference(sl, brain2d, mode="tied", erode=erode, mad_k=mad_k)
     fallback = abs(peak / g["wm_mode"] - 1) > max_disagree
+    peak_mask = g["used_mask"] & (sl >= lo) & (sl <= hi)
     return {"wm": g["wm_mode"] if fallback else peak, "wm_peak": peak,
-            "wm_gmm": g["wm_mode"], "fallback": bool(fallback),
-            "used_mask": g["used_mask"], "wm_mask": g["wm_mask"], "gmm": g}
+            "wm_gmm": g["wm_mode"], "fallback": bool(fallback), "peak_range": (lo, hi),
+            "used_mask": g["used_mask"],
+            "wm_mask": g["wm_mask"] if fallback else peak_mask,
+            "peak_mask": peak_mask, "gmm_wm_mask": g["wm_mask"], "gmm": g}
 
 
 def main():
@@ -202,13 +222,15 @@ def main():
     r = wm_reference_hybrid(sl, brain[:, :, z], erode=args.erode, max_disagree=args.max_disagree)
     print(f"slice {z}: WM = {r['wm']:.1f}  ({'GMM fallback' if r['fallback'] else 'histogram peak'}; "
           f"peak {r['wm_peak']:.1f}, GMM mode {r['wm_gmm']:.1f}; "
-          f"{int(r['used_mask'].sum())} pixels used, {int(r['wm_mask'].sum())} in WM class)")
+          f"{int(r['used_mask'].sum())} pixels used, {int(r['wm_mask'].sum())} behind the value)")
     if args.out:
         import matplotlib
         matplotlib.use("Agg")
         import matplotlib.pyplot as plt
         np.savez_compressed(f"{args.out}_masks.npz", used_mask=r["used_mask"],
-                            wm_mask=r["wm_mask"], slice=z, wm=r["wm"])
+                            wm_mask=r["wm_mask"], peak_mask=r["peak_mask"],
+                            gmm_wm_mask=r["gmm_wm_mask"], slice=z, wm=r["wm"],
+                            fallback=r["fallback"])
         fig, ax = plt.subplots(1, 2, figsize=(10, 5))
         for a in ax:
             a.imshow(sl, cmap="gray", vmax=np.percentile(sl, 99.5))
@@ -218,7 +240,7 @@ def main():
         rgba[r["wm_mask"]] = (0.2, 0.5, 1.0, 0.55)
         ax[1].imshow(rgba)
         ax[1].set_title(f"WM {r['wm']:.0f} ({'GMM' if r['fallback'] else 'peak'}); "
-                        "yellow = used, blue = WM", fontsize=9)
+                        "yellow = used, blue = pixels behind the value", fontsize=9)
         fig.tight_layout()
         fig.savefig(f"{args.out}.png", dpi=110)
         print(f"Saved {args.out}.png and {args.out}_masks.npz")
