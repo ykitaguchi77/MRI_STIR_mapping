@@ -184,10 +184,10 @@ def wm_reference_hybrid(sl: np.ndarray, brain2d: np.ndarray, erode: int = 3,
     by more than `max_disagree` (relative). Returns the chosen value, both
     estimates, `fallback` (True = GMM used; worth a look in QC) and masks:
       used_mask  pixels fed to the estimate (eroded brain, MAD inliers)
-      wm_mask    pixels the chosen value rests on: the pixels under the
-                 histogram peak (half-maximum width) when the peak is used,
-                 the GMM WM class when the GMM value is used
-      peak_mask / gmm_wm_mask  both, regardless of which was chosen"""
+      wm_mask    GMM WM class — used for display whichever value is chosen
+                 (a clean anatomical WM region)
+      peak_mask  pixels under the histogram peak (half-maximum width); the
+                 literal basis of the peak value, but ragged at the WM edge"""
     peak, (lo, hi) = histogram_wm_peak(brain_values(sl, brain2d, erode), return_range=True)
     g = wm_reference(sl, brain2d, mode="tied", erode=erode, mad_k=mad_k)
     fallback = abs(peak / g["wm_mode"] - 1) > max_disagree
@@ -195,8 +195,7 @@ def wm_reference_hybrid(sl: np.ndarray, brain2d: np.ndarray, erode: int = 3,
     return {"wm": g["wm_mode"] if fallback else peak, "wm_peak": peak,
             "wm_gmm": g["wm_mode"], "fallback": bool(fallback), "peak_range": (lo, hi),
             "used_mask": g["used_mask"],
-            "wm_mask": g["wm_mask"] if fallback else peak_mask,
-            "peak_mask": peak_mask, "gmm_wm_mask": g["wm_mask"], "gmm": g}
+            "wm_mask": g["wm_mask"], "peak_mask": peak_mask, "gmm": g}
 
 
 def main():
@@ -222,14 +221,14 @@ def main():
     r = wm_reference_hybrid(sl, brain[:, :, z], erode=args.erode, max_disagree=args.max_disagree)
     print(f"slice {z}: WM = {r['wm']:.1f}  ({'GMM fallback' if r['fallback'] else 'histogram peak'}; "
           f"peak {r['wm_peak']:.1f}, GMM mode {r['wm_gmm']:.1f}; "
-          f"{int(r['used_mask'].sum())} pixels used, {int(r['wm_mask'].sum())} behind the value)")
+          f"{int(r['used_mask'].sum())} pixels used, {int(r['wm_mask'].sum())} in the WM class)")
     if args.out:
         import matplotlib
         matplotlib.use("Agg")
         import matplotlib.pyplot as plt
         np.savez_compressed(f"{args.out}_masks.npz", used_mask=r["used_mask"],
                             wm_mask=r["wm_mask"], peak_mask=r["peak_mask"],
-                            gmm_wm_mask=r["gmm_wm_mask"], slice=z, wm=r["wm"],
+                            slice=z, wm=r["wm"],
                             fallback=r["fallback"])
         fig, ax = plt.subplots(1, 2, figsize=(10, 5))
         for a in ax:
@@ -240,7 +239,7 @@ def main():
         rgba[r["wm_mask"]] = (0.2, 0.5, 1.0, 0.55)
         ax[1].imshow(rgba)
         ax[1].set_title(f"WM {r['wm']:.0f} ({'GMM' if r['fallback'] else 'peak'}); "
-                        "yellow = used, blue = pixels behind the value", fontsize=9)
+                        "yellow = used, blue = WM (GMM class)", fontsize=9)
         fig.tight_layout()
         fig.savefig(f"{args.out}.png", dpi=110)
         print(f"Saved {args.out}.png and {args.out}_masks.npz")

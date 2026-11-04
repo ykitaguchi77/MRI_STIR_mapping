@@ -11,8 +11,8 @@ histogram peak, the tied-GMM mode (MAD outlier rule) and the hybrid value, each
 as % difference from the manual ROI mean. It also writes the pixels the
 estimate rests on:
   hybrid_masks.npz   per case: used_mask (pixels fed to the fit) and wm_mask
-                     (pixels behind the chosen WM value), plus the slice index
-  hybrid_masks.png   slice | used pixels (yellow) + pixels behind the value (blue) + reader ROI
+                     (GMM WM class, for display), plus the slice index
+  hybrid_masks.png   slice | used pixels (yellow) + WM class (blue) + reader ROI
 Outputs contain patient images — keep them out of git.
 """
 
@@ -125,7 +125,7 @@ def main():
         a.axis("off")
     for k in range(len(panels), nrow * ncol):
         axes[k // ncol, k % ncol].axis("off")
-    fig.suptitle("Pixels used (yellow), pixels behind the WM value (blue); red = reader ROI", fontsize=10)
+    fig.suptitle("Pixels used (yellow), WM class by GMM (blue); red = reader ROI", fontsize=10)
     fig.tight_layout()
     fig.savefig(out / "hybrid_masks.png", dpi=110)
     print(f"Saved {out / 'hybrid_per_case.csv'}, {out / 'hybrid_masks.npz'}, {out / 'hybrid_masks.png'}")
