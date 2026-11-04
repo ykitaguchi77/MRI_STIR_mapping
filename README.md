@@ -126,13 +126,16 @@ In Python: `wm_gmm.wm_reference_hybrid(slice_2d, brain_mask_2d)["wm"]`.
 
 ![white-matter histogram: peak and curve fit](assets/example_wm_histogram.png)
 
-*Brightness histogram of the brain pixels on one slice (grey bars), with the
-three fitted curves (dashed) and the two estimates. **A**: the darkest hump is
-white matter; the peak (red) is used and matches the reader's ROI (purple
-dotted). **B**: a slice with little white matter — white matter is only a low
-shoulder at the left, and the darkest real hump is grey matter. The peak is
-112% higher than the curve-fit value, so the curve-fit value (blue) is used,
-again close to the reader's ROI.*
+*Two example slices. Left: the slice; middle: blue = white matter found by the
+curve fit, red = pixels whose brightness is at the histogram peak, magenta =
+the reader's ROI; right: brightness histogram of the brain pixels (grey bars)
+with the three fitted curves (dashed) and the two estimates.
+**A**: the darkest hump is white matter — the red pixels lie on white matter,
+so the peak (red line) is used; it matches the reader's ROI (purple dotted).
+**B**: a slice with little white matter — white matter is only a low shoulder at
+the left, and the darkest real hump is grey matter: the red pixels lie on the
+cortex. The peak is 112% above the curve-fit value, so the curve-fit value
+(blue line) is used instead, again close to the reader's ROI.*
 
 Checked against a reader's elliptical ROIs on the same slice in 19 patients:
 the value differs from the reader's by +0.2 ± 4.1% on average (largest 8.6%).
